@@ -1,0 +1,7 @@
+[
+  {"country": "India", "state": "Bihar", "city": "Patna", "station": "Govt. High School Shikarpur", "last_update": "23-06-2026 16:00:00", "pollutant_id": "PM2.5", "avg_value": "31"},
+  {"country": "India", "state": "Bihar", "city": "Patna", "station": "IGSC Planetarium", "last_update": "23-06-2026 16:00:00", "pollutant_id": "SO2", "avg_value": "9"},
+  {"country": "India", "state": "Delhi", "city": "Delhi", "station": "Anand Vihar", "last_update": "23-06-2026 16:00:00", "pollutant_id": "PM2.5", "avg_value": "187"},
+  {"country": "India", "state": "Maharashtra", "city": "Mumbai", "station": "Bandra", "last_update": "23-06-2026 16:00:00", "pollutant_id": "NO2", "avg_value": "45"},
+  {"country": "India", "state": "Karnataka", "city": "Bengaluru", "station": "Silk Board", "last_update": "23-06-2026 16:00:00", "pollutant_id": "PM10", "avg_value": "78"}
+]
