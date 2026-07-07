@@ -1,6 +1,6 @@
 # India AQI Data Lake 🌫️
 
-An end-to-end, production-style data engineering pipeline that ingests, processes, analyzes, and forecasts Air Quality Index (AQI) data for 10 major Indian cities — built to demonstrate the full skill set expected of a Data Engineer / ML Engineer: streaming ingestion, medallion architecture, orchestration, ML forecasting, and cloud deployment.
+An end-to-end, production-style data engineering pipeline that ingests, processes, analyze and forecasts Air Quality Index (AQI) data for 10 major Indian cities — built to demonstrate the full skill set expected of a Data Engineer / ML Engineer: streaming ingestion, medallion architecture, orchestration, ML forecasting and cloud deployment.
 
 **Built by:** Arish
 
@@ -8,7 +8,7 @@ An end-to-end, production-style data engineering pipeline that ingests, processe
 
 ## Why I Built This
 
-I wanted a project that didn't just "call an API and make a chart" — I wanted to actually build the kind of data platform that companies like Amazon, Flipkart, or JP Morgan run internally: multiple layers of data quality, real streaming infrastructure, a model on top, and a real (if cost-conscious) cloud deployment. This project follows directly from an earlier one I built — a **Realtime Crypto Data Platform** — which taught me streaming fundamentals. This project goes further: full medallion architecture, batch + streaming hybrid processing, ML forecasting, and orchestration.
+I wanted a project that didn't just "call an API and make a chart" — I wanted to actually build the kind of data platform that companies like Amazon, Flipkart or JP Morgan run internally: multiple layers of data quality, real streaming infrastructure, a model on top and a real (if cost-conscious) cloud deployment. This project follows directly from an earlier one I built — This project goes further: full medallion architecture, batch + streaming hybrid processing, ML forecasting, and orchestration.
 
 ---
 
