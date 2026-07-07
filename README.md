@@ -2,7 +2,7 @@
 
 An end-to-end, production-style data engineering pipeline that ingests, processes, analyzes, and forecasts Air Quality Index (AQI) data for 10 major Indian cities — built to demonstrate the full skill set expected of a Data Engineer / ML Engineer: streaming ingestion, medallion architecture, orchestration, ML forecasting, and cloud deployment.
 
-**Built by:** Arish Mahammad — B.Tech CSE (Data Science), IEM New Town Kolkata
+**Built by:** Arish
 
 ---
 
@@ -112,29 +112,37 @@ The instance was intentionally short-lived: launched, verified, screenshotted, a
 
 Building this end-to-end surfaced real engineering problems — not textbook ones. Here are the ones that taught me the most.
 
-### 1. OpenWeatherMap's AQI scale doesn't match India's CPCB scale
-OWM returns AQI as a 1–5 index, not the 0–500 CPCB scale India actually uses. My first instinct — multiplying by 100 — produced wrong values that didn't match real-world city readings. I fixed it with a proper lookup table calibrated against known city AQI values:
+### 1. Silver layer crashed reading fields that didn't exist yet
+**Error:** My Bronze layer stores the whole AQI payload as one big JSON string, inside a column called `raw_json` — it's not split into separate columns. My Silver script tried to read fields like `aqi` and `pm25` directly, before ever unpacking that JSON string, so every field access failed.
+**Fix:** I made sure `parse_raw_json()` always runs *first*, before any cleaning step touches individual fields. Kafka wraps data in an envelope, Bronze keeps that envelope sealed, and Silver has to open it before doing anything else.
+
+### 2. OpenWeatherMap's AQI scale didn't match India's real scale
+**Error:** OWM returns AQI as a simple 1–5 index, not the 0–500 scale India's CPCB actually uses. My first attempt — just multiplying by 100 — gave numbers that didn't match real city readings at all.
+**Fix:** I built a lookup table calibrated against real AQI values for Indian cities:
 ```python
 OWM_TO_CPCB = {1: 35, 2: 75, 3: 150, 4: 250, 5: 400}
 ```
+Then I checked the output against actual reported AQI for cities like Delhi and Mumbai to confirm it was accurate, not just a number that looked plausible.
 
-### 2. Silver layer crashed reading fields that didn't exist yet
-My Bronze layer stores the full AQI payload as a **JSON string** inside a `raw_json` column — not as separate columns. My Silver cleaning script tried to filter and deduplicate on fields like `aqi` and `pm25` before parsing that JSON string, so every field access failed. The fix was ordering: `parse_raw_json()` must always run *before* any other cleaning step touches individual fields.
+### 3. EC2 ran out of disk space installing the full pipeline
+**Error:** My first EC2 deploy attempt ran `pip install -r requirements.txt`, which includes PySpark — a 317MB download that needs even more space to unpack. My 8GB EC2 disk, already running Ubuntu, hit `OSError: Disk quota exceeded` partway through.
+**Fix:** I realized the dashboard only actually needs `streamlit`, `duckdb`, `pandas`, and `plotly` — it never touches PySpark or Kafka directly, since it just reads pre-computed results from a DuckDB file. So I installed only what the dashboard needed. This turned a failure into a real architecture decision: **separate the serving layer from the processing layer** — the same pattern real companies use so a lightweight dashboard doesn't need the same infrastructure as heavy batch processing.
 
-### 3. Kafka client crashed on Python 3.12
-The standard `kafka-python` library has a known incompatibility with Python 3.12 that causes hard crashes on import. Switching to the community-maintained `kafka-python-ng` fork resolved it with zero code changes — same API, active compatibility patches.
+### 4. PySpark silently failed on Windows without Hadoop binaries
+**Error:** PySpark expects a Hadoop-style filesystem layer even on Windows, provided by a file called `winutils.exe`. Without it set up correctly, Spark jobs failed with confusing native-library errors that gave no clear clue what was actually wrong.
+**Fix:** I set `HADOOP_HOME=C:\hadoop` and added `C:\hadoop\bin` to `PATH` at the process level, every time, before running any Spark job. This taught me that "works on my machine" isn't the same as "works in production" — environment setup is part of the job, not a footnote.
 
-### 4. PySpark on Windows silently failed without Hadoop binaries
-PySpark expects a Linux/Hadoop-style filesystem layer even on Windows, via `winutils.exe`. Without `HADOOP_HOME` set correctly at the process level before every Spark job, jobs failed with cryptic native-library errors. I standardized on setting `HADOOP_HOME=C:\hadoop` and appending `C:\hadoop\bin` to `PATH` before every run.
+### 5. Kafka client crashed on Python 3.12
+**Error:** The standard `kafka-python` library has a known bug that crashes immediately on import when used with Python 3.12.
+**Fix:** I switched to `kafka-python-ng`, a community-maintained fork with the same API but active compatibility fixes. Zero code changes needed — just a smarter dependency choice.
 
-### 5. `pandas.Styler.applymap` deprecated in newer pandas
-When I deployed to EC2, the freshest available `pip install pandas` pulled a much newer version than what I'd tested locally, and `Styler.applymap()` — used to color-code my health risk table — had been renamed to `Styler.map()`. A one-line fix, but a good reminder that "works on my machine" isn't the same as "works in production," especially with unpinned dependency versions.
+### 6. Windows SSH key permissions blocked EC2 login
+**Error:** Connecting to my EC2 instance kept failing with `Permission denied (publickey)`, even with the correct key file. Windows, by default, gives `.pem` files much broader permissions than SSH allows — and my first fix attempt with `icacls` accidentally left behind a stray, unresolved user entry that caused a second, different failure.
+**Fix:** I used Windows' **Advanced Security Settings** to make sure exactly one account — my own, Read-only — had access to the key file, with nothing else attached. Once permissions were clean, SSH connected right away.
 
-### 6. EC2 disk quota exceeded trying to install the full pipeline
-My first attempt at deploying the dashboard tried to `pip install -r requirements.txt`, which includes PySpark (a 317MB download that needs even more space to unpack). On an 8GB EC2 disk already running Ubuntu, this failed with `OSError: Disk quota exceeded`. Since the dashboard only imports `streamlit`, `duckdb`, `pandas`, and `plotly` — not PySpark or Kafka at all — I installed only what was actually needed. This turned into the architecture decision described above: separate the serving layer from the processing layer, both technically and operationally.
-
-### 7. Windows SSH key permissions blocked by leftover ACL entries
-Connecting to EC2 via SSH kept failing with `Permission denied (publickey)` even with the correct key file, because Windows' default file permissions are far more permissive than SSH allows. Running `icacls` to strip inherited permissions once left a stray, unresolved security identifier behind, which caused a second silent failure. The real fix was using **Advanced Security Settings** in Windows to ensure exactly one principal — my own user account, Read-only — had access to the `.pem` file.
+### 7. PySpark streaming timeout was killing my orchestrator
+**Error:** My Bronze layer runs as a continuous PySpark Structured Streaming job — it's supposed to keep running, not finish and exit. My orchestration scheduler was treating the subprocess's `TimeoutExpired` (which happens naturally when a healthy stream is still running) as a crash, and kept marking successful runs as failures.
+**Fix:** I updated the scheduler to catch `TimeoutExpired` and treat it as a **success signal** for streaming jobs specifically, since a stream that's still running is behaving exactly as expected. This taught me the difference between "the job failed" and "the job is a long-running process behaving normally" — a distinction that matters a lot in real streaming systems.
 
 ---
 
@@ -183,4 +191,4 @@ mlflow ui
 
 - Feed the scheduler more days of real data to improve LSTM accuracy beyond the current 76.6 MAE
 - Short Snowflake trial to replace DuckDB for the resume-facing version of this project
-- Continued interview prep: explaining this architecture end-to-end, and the debugging journey above, without notes
+- Continued interview prep: explaining this architecture end-to-end and the debugging journey above, without notes
