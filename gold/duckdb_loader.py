@@ -21,8 +21,6 @@ def connect_duckdb():
     return conn     # the connection object all other functions will use to run SQL queries
 
 
-
-
 def install_s3_extension(conn):
     conn.execute("INSTALL httpfs;")
     conn.execute("LOAD httpfs;")
@@ -30,7 +28,6 @@ def install_s3_extension(conn):
     conn.execute(f"SET s3_access_key_id='{settings_module.AWS_ACCESS_KEY_ID}';")
     conn.execute(f"SET s3_secret_access_key='{settings_module.AWS_SECRET_ACCESS_KEY}';")
     logger.info("S3 extension installed and configured.")
-
 
 
 
