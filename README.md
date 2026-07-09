@@ -162,6 +162,50 @@ india-aqi-data-lake/
 ├── docker-compose.yml  # Kafka + Zookeeper (local)
 └── requirements.txt
 ```
+---
+
+## Deployment Process — Step by Step
+
+I wanted to document not just *that* I deployed this, but *how* and *why* I made each decision along the way — since the reasoning matters as much as the result.
+
+### Step 1: Prepared the GitHub repo first
+Before touching AWS at all, I made sure my code was pushed to GitHub with a proper `.gitignore` (excluding `.env`, `venv/`, `mlruns/`). **Why:** I didn't want to be editing files live on a paid EC2 instance — better to clone a clean, ready repo and just run it.
+
+### Step 2: Tried to launch a `t3.medium` instance — blocked by AWS's Free Plan
+I originally planned to use `t3.medium` (4GB RAM) so Kafka, Spark, and the dashboard could all run together. AWS blocked this — my account was on their newer "Free Plan" tier, which only allows `t3.micro`/`t2.micro` instances until you formally upgrade billing plans. **Why I didn't upgrade:** upgrading wasn't necessary for what I actually needed to prove, and I wanted to stay strictly within free-tier-safe territory for a demo.
+
+### Step 3: Made an architecture decision instead of fighting the RAM limit
+With only 1GB RAM available on `t3.micro`, running Kafka + Zookeeper + PySpark + Streamlit together risked constant crashes. Instead of forcing it, I deployed **only the Streamlit dashboard** — the serving layer — since it just reads pre-computed results from a DuckDB file and doesn't need Kafka or Spark at runtime at all. **Why:** this is a legitimate real-world pattern — heavy processing infrastructure and lightweight serving layers are often deployed separately — and it kept the whole demo simple, cheap, and stable.
+
+### Step 4: Launched the EC2 instance
+- AMI: Ubuntu 26.04 LTS
+- Instance type: `t3.micro`
+- Storage: 8GB gp3 (default) — enough since I wasn't installing Spark/Kafka
+- Security group: SSH (port 22) and Streamlit (port 8501), both restricted to my own IP only
+**Why restrict to my IP:** no reason to expose SSH or the dashboard port to the entire internet for a temporary demo.
+
+### Step 5: Connected via SSH and hit a Windows permissions issue
+My `.pem` key file had overly broad Windows permissions by default, which SSH refuses to accept for security reasons. I fixed it using Windows' **Advanced Security Settings**, giving Read-only access to just my own account and removing every other entry. **Why it matters:** SSH enforces this so a private key can't be read by other users on a shared machine — good practice, not just an annoying hoop.
+
+### Step 6: Installed only what the dashboard actually needed
+Instead of running `pip install -r requirements.txt` (which includes PySpark, a 300MB+ package), I checked my dashboard's actual imports first (`streamlit`, `duckdb`, `pandas`, `plotly`) and installed only those. **Why:** my first attempt at installing everything hit a disk quota error on the small EC2 disk — trimming the install was both the fix and the more correct approach, since the dashboard never touches PySpark directly.
+
+### Step 7: Ran the dashboard and verified it publicly
+```bash
+streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port 8501
+```
+I opened `http://<EC2-public-IP>:8501` in my browser and confirmed the dashboard rendered real data pulled from the Gold-layer DuckDB file — not placeholder content. **Why this step matters:** this is the actual proof that the pipeline's output is cloud-reachable, not just working on my laptop.
+
+### Step 8: Captured evidence before tearing anything down
+I took screenshots of: the SSH session, the Streamlit launch command with the external URL, the live dashboard sections, the EC2 instance details in the AWS console, and the S3 bucket showing real Bronze/Silver data. **Why:** once the instance is terminated, the public IP becomes invalid — so all proof had to be captured while it was still live.
+
+### Step 9: Terminated the EC2 instance immediately after
+```bash
+# stopped Streamlit with Ctrl+C, then exited SSH
+exit
+```
+Then in the AWS console: **EC2 → Instance State → Terminate** (not just Stop). **Why terminate, not stop:** a stopped instance can still incur storage costs; terminating fully releases it. My total cost for this entire deployment exercise came out to about $0.17.
+
 
 ---
 
