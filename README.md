@@ -8,7 +8,7 @@ An end-to-end, production-style data engineering pipeline that ingests, processe
 
 ## Why I Built This
 
-I wanted a project that didn't just "call an API and make a chart" — I wanted to actually build the kind of data platform that companies like Amazon, Flipkart or JP Morgan run internally: multiple layers of data quality, real streaming infrastructure, a model on top and a real (if cost-conscious) cloud deployment. This project follows directly from an earlier one I built — This project goes further: full medallion architecture, batch + streaming hybrid processing, ML forecasting, and orchestration.
+I wanted a project that didn't just "call an API and make a chart" — I wanted to actually build the kind of data platform that companies like Amazon, Flipkart or JP Morgan run internally: multiple layers of data quality, real streaming infrastructure, a model on top and a real (if cost-conscious) cloud deployment. This project follows directly from an earlier one I built — This project goes further: full medallion architecture, batch + streaming hybrid processing, ML forecasting and orchestration.
 
 ---
 
